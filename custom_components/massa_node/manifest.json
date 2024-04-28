@@ -1,0 +1,15 @@
+{
+  "domain": "massa_node",
+  "name": "Massa Node",
+  "codeowners": ["@kevin-briand"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/kevin-briand/massa_node",
+  "issue_tracker": "https://github.com/kevin-briand/massa_node/issues",
+  "homekit": {},
+  "iot_class": "local_polling",
+  "requirements": [],
+  "ssdp": [],
+  "version": "0.1.0",
+  "zeroconf": []
+}

@@ -1,0 +1,21 @@
+{
+    "config": {
+        "abort": {
+            "single_instance_allowed": "Une seule instance de l'intégration possible"
+        },
+        "error": {
+            "cannot_connect": "Echec de connexion, vérifiez votre ip et port",
+            "invalid_port": "Le port doit être entre 0 et 65535",
+            "invalid_address": "L'adresse du portefeuille doit contenir 53 caractères"
+        },
+        "step": {
+            "user": {
+                "data": {
+                  "ip": "Ip",
+                  "port": "Port",
+                  "wallet_address": "Adresse du portefeuille"
+                }
+            }
+        }
+   }
+}

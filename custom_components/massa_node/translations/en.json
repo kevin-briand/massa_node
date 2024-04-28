@@ -1,0 +1,21 @@
+{
+    "config": {
+        "abort": {
+            "single_instance_allowed": "Only single instance is available"
+        },
+        "error": {
+            "cannot_connect": "fail to connect, check your ip and port",
+            "invalid_port": "the port must be between 0 and 65535",
+            "invalid_address": "the wallet address must be contains 53 characters"
+        },
+        "step": {
+            "user": {
+                "data": {
+                  "ip": "Ip",
+                  "port": "Port",
+                  "wallet_address": "Wallet Address"
+                }
+            }
+        }
+   }
+}
