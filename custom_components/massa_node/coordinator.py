@@ -13,11 +13,13 @@ from custom_components.massa_node.api.bitget_api import BitgetApi
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class Data:
     """Object class of MassaCoordinator data"""
-    def __init__(self, status = 'Offline', massa_price = 0, wallet_amount = 0, produced_block = 0,
-                 missed_block = 0, active_rolls = 0, total_amount = 0, wallet_amount_with_rolls = 0,
-                 last_total_update = datetime.date.today().isoformat(), total_wallet_at_midnight = 0, **kwargs):
+
+    def __init__(self, status='Offline', massa_price=0, wallet_amount=0, produced_block=0,
+                 missed_block=0, active_rolls=0, total_amount=0, wallet_amount_with_rolls=0,
+                 last_total_update=datetime.date.today().isoformat(), total_wallet_at_midnight=0, **kwargs):
         """Init object"""
         self.status: str = status
         self.massa_price: float = massa_price
@@ -81,14 +83,18 @@ class MassaCoordinator(DataUpdateCoordinator):
         try:
             async with async_timeout.timeout(15):
                 # fetch data
-                address_info = await self.node_api.get_address()
                 status = await self.node_api.test_connection()
-                actual_price = await BitgetApi().get_massa_price()
-                if not address_info:
-                    return
-                # Update coordinator data object
                 self.data.status = 'Online' if status else 'Offline'
+                if not status:
+                    return self.data
+
+                actual_price = await BitgetApi().get_massa_price()
                 self.data.massa_price = actual_price
+
+                address_info = await self.node_api.get_address()
+                if not address_info:
+                    return self.data
+                # Update coordinator data object
                 self.data.wallet_amount = float(address_info.final_balance)
                 self.data.produced_block = sum(cycle.ok_count for cycle in address_info.cycle_infos)
                 self.data.missed_block = sum(cycle.nok_count for cycle in address_info.cycle_infos)
@@ -105,6 +111,7 @@ class MassaCoordinator(DataUpdateCoordinator):
                 return self.data
         except ApiError as err:
             raise UpdateFailed(f"Error communicating with API: {err}")
+
 
 class ApiError(exceptions.HomeAssistantError):
     """Error to indicate that data cannot be retrieved."""

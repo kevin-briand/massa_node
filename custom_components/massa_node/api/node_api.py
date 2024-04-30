@@ -5,8 +5,10 @@ from typing import Optional
 import requests
 from homeassistant.core import HomeAssistant
 
+
 class CycleInfo:
     """Object class of a massa cycle"""
+
     def __init__(self, cycle, is_final, ok_count, nok_count, active_rolls, **kwargs):
         self.cycle: int = cycle
         self.is_final: bool = is_final
@@ -14,8 +16,10 @@ class CycleInfo:
         self.nok_count: int = nok_count
         self.active_rolls: int = active_rolls
 
+
 class AddressInfo:
     """Object class of a massa address"""
+
     def __init__(self, address, final_balance, final_roll_count, candidate_balance,
                  candidate_roll_count, cycle_infos, **kwargs):
         self.address: str = address
@@ -24,6 +28,7 @@ class AddressInfo:
         self.candidate_balance: str = candidate_balance
         self.candidate_roll_count: int = candidate_roll_count
         self.cycle_infos: [CycleInfo] = [CycleInfo(**cycle_info) for cycle_info in cycle_infos]
+
 
 class NodeApi:
     """API of MASSA node, used for fetch some information of local node"""
@@ -44,20 +49,26 @@ class NodeApi:
 
     async def test_connection(self) -> bool:
         """test if node is online, return a boolean"""
-        response = await asyncio.to_thread( self._get_status_request)
-        return response.status_code == 200
+        try:
+            response = await asyncio.to_thread(self._get_status_request)
+            return response.status_code == 200
+        except Exception:
+            return False
 
     async def get_address(self) -> Optional[AddressInfo]:
         """fetch information of a wallet"""
-        response = await asyncio.to_thread(self._get_address_request)
-        if response.status_code != 200:
-            return
-        data = response.json()
-        if not data['result']:
-            return
-        address_info = data['result'][0]
-        result = AddressInfo(**address_info)
-        return result
+        try:
+            response = await asyncio.to_thread(self._get_address_request)
+            if response.status_code != 200:
+                return
+            data = response.json()
+            if not data['result']:
+                return
+            address_info = data['result'][0]
+            result = AddressInfo(**address_info)
+            return result
+        except Exception:
+            return None
 
     def _get_status_request(self):
         """request for fetch latest data of status"""
