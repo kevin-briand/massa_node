@@ -1,6 +1,7 @@
 {
-  "name": "massa_node",
+  "name": "Massa Node",
   "render_readme": true,
   "zip_release": true,
-  "filename": "massa_node.zip"
+  "filename": "massa_node.zip",
+  "homeassistant": "2025.2.0"
 }

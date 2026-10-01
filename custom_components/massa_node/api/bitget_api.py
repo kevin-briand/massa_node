@@ -1,29 +1,35 @@
-import asyncio
-import logging
+"""Async client for the Bitget public market API (MAS price)."""
 
-import requests
-_LOGGER = logging.getLogger(__name__)
+from __future__ import annotations
+
+import asyncio
+
+import aiohttp
+
+from ..const import REQUEST_TIMEOUT
+from .errors import MassaApiError
+
 
 class BitgetApi:
-    """Api of Bitget.com"""
-    _base_url = 'https://api.bitget.com/api/v2/spot/market/'
-    _headers = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-    }
+    """Fetch the MAS/USDT price from bitget.com."""
+
+    _URL = "https://api.bitget.com/api/v2/spot/market/tickers"
+
+    def __init__(self, session: aiohttp.ClientSession) -> None:
+        self._session = session
 
     async def get_massa_price(self) -> float:
-        """get last price of massa, it returns a float of price MAS-USDT"""
-        response = await asyncio.to_thread(self._get_massa_price_request)
-        if response.status_code != 200:
-            return 0
-        data = response.json()
-        return float(data['data'][0]["lastPr"])
-
-    def _get_massa_price_request(self):
-        """request for fetch latest data of MAS-USDT"""
-        response = requests.get(
-            f'{self._base_url}tickers?symbol=MASUSDT',
-            headers=self._headers
-        )
-        return response
+        """Return the last MAS/USDT price, raise MassaApiError on failure."""
+        try:
+            async with self._session.get(
+                self._URL,
+                params={"symbol": "MASUSDT"},
+                timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
+            ) as response:
+                response.raise_for_status()
+                body = await response.json(content_type=None)
+            return float(body["data"][0]["lastPr"])
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
+            raise MassaApiError(f"Cannot fetch MAS price: {err}") from err
+        except (KeyError, IndexError, TypeError) as err:
+            raise MassaApiError(f"Unexpected Bitget response: {err}") from err

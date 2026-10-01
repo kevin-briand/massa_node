@@ -1,89 +1,122 @@
-"""MASSA node API class"""
+"""Async client for the public JSON-RPC API of a Massa node."""
+
+from __future__ import annotations
+
 import asyncio
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Any
 
-import requests
-from homeassistant.core import HomeAssistant
+import aiohttp
+
+from ..const import REQUEST_TIMEOUT
+from .errors import MassaApiError
 
 
+@dataclass(slots=True)
 class CycleInfo:
-    """Object class of a massa cycle"""
+    """Production statistics of the address for one cycle."""
 
-    def __init__(self, cycle, is_final, ok_count, nok_count, active_rolls, **kwargs):
-        self.cycle: int = cycle
-        self.is_final: bool = is_final
-        self.ok_count: int = ok_count
-        self.nok_count: int = nok_count
-        self.active_rolls: int = active_rolls
+    cycle: int
+    is_final: bool
+    ok_count: int
+    nok_count: int
+    active_rolls: int | None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> CycleInfo:
+        return cls(
+            cycle=int(data.get("cycle", 0)),
+            is_final=bool(data.get("is_final", False)),
+            ok_count=int(data.get("ok_count", 0)),
+            nok_count=int(data.get("nok_count", 0)),
+            active_rolls=data.get("active_rolls"),
+        )
 
 
+@dataclass(slots=True)
 class AddressInfo:
-    """Object class of a massa address"""
+    """Information about a wallet address."""
 
-    def __init__(self, address, final_balance, final_roll_count, candidate_balance,
-                 candidate_roll_count, cycle_infos, **kwargs):
-        self.address: str = address
-        self.final_balance: str = final_balance
-        self.final_roll_count: int = final_roll_count
-        self.candidate_balance: str = candidate_balance
-        self.candidate_roll_count: int = candidate_roll_count
-        self.cycle_infos: [CycleInfo] = [CycleInfo(**cycle_info) for cycle_info in cycle_infos]
+    address: str
+    final_balance: float
+    final_roll_count: int
+    candidate_balance: float
+    candidate_roll_count: int
+    deferred_credits: float
+    cycle_infos: list[CycleInfo] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> AddressInfo:
+        deferred = sum(
+            float(credit.get("amount", 0)) for credit in data.get("deferred_credits") or []
+        )
+        return cls(
+            address=data["address"],
+            final_balance=float(data.get("final_balance", 0)),
+            final_roll_count=int(data.get("final_roll_count", 0)),
+            candidate_balance=float(data.get("candidate_balance", 0)),
+            candidate_roll_count=int(data.get("candidate_roll_count", 0)),
+            deferred_credits=deferred,
+            cycle_infos=[CycleInfo.from_dict(c) for c in data.get("cycle_infos") or []],
+        )
+
+
+@dataclass(slots=True)
+class NodeStatus:
+    """Subset of the node status we care about."""
+
+    node_id: str | None
+    version: str | None
+    current_cycle: int | None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> NodeStatus:
+        cycle = data.get("current_cycle")
+        return cls(
+            node_id=data.get("node_id"),
+            version=data.get("version"),
+            current_cycle=int(cycle) if cycle is not None else None,
+        )
 
 
 class NodeApi:
-    """API of MASSA node, used for fetch some information of local node"""
-    _ip: str
-    _port: int
-    _wallet_address: str
-    _headers = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-    }
+    """Client of the Massa node public API (JSON-RPC over HTTP)."""
 
-    def __init__(self, hass: HomeAssistant, ip: str, port: int, wallet_address: str) -> None:
-        """Init API"""
-        self._ip = ip
-        self._port = port
-        self._wallet_address = wallet_address
-        self._base_url = 'http://' + self._ip + ':' + str(self._port) + '/'
+    def __init__(self, session: aiohttp.ClientSession, host: str, port: int) -> None:
+        self._session = session
+        self._url = f"http://{host}:{port}/"
+        self._request_id = 0
 
-    async def test_connection(self) -> bool:
-        """test if node is online, return a boolean"""
+    async def _call(self, method: str, params: list[Any] | None = None) -> Any:
+        self._request_id += 1
+        payload: dict[str, Any] = {"jsonrpc": "2.0", "id": self._request_id, "method": method}
+        if params is not None:
+            payload["params"] = params
         try:
-            response = await asyncio.to_thread(self._get_status_request)
-            return response.status_code == 200
-        except Exception:
-            return False
+            async with self._session.post(
+                self._url,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT),
+            ) as response:
+                response.raise_for_status()
+                body = await response.json(content_type=None)
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
+            raise MassaApiError(f"Error calling {method} on {self._url}: {err}") from err
 
-    async def get_address(self) -> Optional[AddressInfo]:
-        """fetch information of a wallet"""
-        try:
-            response = await asyncio.to_thread(self._get_address_request)
-            if response.status_code != 200:
-                return
-            data = response.json()
-            if not data['result']:
-                return
-            address_info = data['result'][0]
-            result = AddressInfo(**address_info)
-            return result
-        except Exception:
+        if not isinstance(body, dict):
+            raise MassaApiError(f"Unexpected response to {method}: {body!r}")
+        if body.get("error"):
+            raise MassaApiError(f"Node returned an error for {method}: {body['error']}")
+        return body.get("result")
+
+    async def get_status(self) -> NodeStatus:
+        """Return the node status, raise MassaApiError if the node is unreachable."""
+        result = await self._call("get_status")
+        return NodeStatus.from_dict(result or {})
+
+    async def get_address(self, address: str) -> AddressInfo | None:
+        """Return information about a wallet address, or None if unknown."""
+        result = await self._call("get_addresses", [[address]])
+        if not result:
             return None
-
-    def _get_status_request(self):
-        """request for fetch latest data of status"""
-        response = requests.post(
-            self._base_url,
-            json={'jsonrpc': '2.0', 'id': 1, 'method': 'get_status'},
-            headers=self._headers
-        )
-        return response
-
-    def _get_address_request(self):
-        """request for fetch latest data of a wallet"""
-        response = requests.post(
-            self._base_url,
-            json={'jsonrpc': '2.0', 'id': 1, 'method': 'get_addresses', 'params': [[self._wallet_address]]},
-            headers=self._headers
-        )
-        return response
+        return AddressInfo.from_dict(result[0])

@@ -1,0 +1,20 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "status": { "default": "mdi:server-network" }
+    },
+    "sensor": {
+      "massa_price": { "default": "mdi:chart-line" },
+      "wallet_amount": { "default": "mdi:wallet" },
+      "wallet_amount_with_rolls": { "default": "mdi:wallet-plus" },
+      "total_amount": { "default": "mdi:cash-multiple" },
+      "total_gain_of_day": { "default": "mdi:trending-up" },
+      "active_rolls": { "default": "mdi:cube-outline" },
+      "produced_block": { "default": "mdi:cube-send" },
+      "missed_block": { "default": "mdi:cube-off-outline" },
+      "block_miss_rate": { "default": "mdi:percent-outline" },
+      "current_cycle": { "default": "mdi:sync" },
+      "node_version": { "default": "mdi:tag-outline" }
+    }
+  }
+}

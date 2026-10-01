@@ -5,11 +5,10 @@
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/kevin-briand/massa_node",
-  "homekit": {},
+  "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/kevin-briand/massa_node/issues",
+  "loggers": ["custom_components.massa_node"],
   "requirements": [],
-  "ssdp": [],
-  "version": "0.0.0",
-  "zeroconf": []
+  "version": "0.0.0"
 }
